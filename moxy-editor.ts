@@ -135,12 +135,7 @@ class MoxyEditor {
         }
         this._editor.oncopy = (e) => {
             if (this._editorAction === 'cut') {
-                let text
-                if (window.getSelection) {
-                    text = window.getSelection().toString()
-                } else if (document.selection && document.selection.type !== 'Control') {
-                    text = document.selection.createRange().text
-                }
+                let text: string = this._getSelectedText()
                 e.clipboardData.setData('text', text)
                 this._editorAction = ''
                 this._clearEditor()
@@ -165,6 +160,15 @@ class MoxyEditor {
         e.stopPropagation()
     }
 
+    private _getSelectedText = (): string => {
+        let text: string
+        if (window.getSelection) {
+            text = window.getSelection().toString()
+        } else if (document.selection && document.selection.type !== 'Control') {
+            text = document.selection.createRange().text
+        }
+        return text
+    }
     private _getCaretCharOffset = (element: any) => {
         let caretOffset = 0
 
@@ -406,8 +410,6 @@ class MoxyEditor {
         }
     }
 
-    // TODO - insert tab before text
-    // TODO - select all
     private _handleKeyPress(e: any): void {
         if (e.keyCode === 13) {
             const offset = this._getCaretCharOffset(e.target)
@@ -426,7 +428,18 @@ class MoxyEditor {
         }
         if (e.keyCode >= 32 && e.keyCode <= 127) {
             e.preventDefault()
-            this._tasteTheRainbow(e.target, String.fromCharCode(e.keyCode))
+            // Handles replacing selected text
+            if (this._getSelectedText().length > 1) {
+                const end = this._getCaretCharOffset(e.target)
+                const start = end - this._getSelectedText().length
+                e.target.innerText =
+                    e.target.innerText.substring(0, start)
+                    + String.fromCharCode(e.keyCode)
+                    + e.target.innerText.substring(end)
+                this._tasteTheRainbow(e.target, '', end)
+            } else {
+                this._tasteTheRainbow(e.target, String.fromCharCode(e.keyCode))
+            }
         }
     }
 
