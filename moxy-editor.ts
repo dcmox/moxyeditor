@@ -238,7 +238,6 @@ class MoxyEditor {
 
     private _setSelectionRange = (el: any, start: number, end: number) => {
         if (document.createRange && window.getSelection) {
-            console.log('look')
             const range = document.createRange()
             range.selectNodeContents(el)
             const textNodes = this._getTextNodesIn(el)
@@ -578,7 +577,7 @@ class MoxyEditor {
 
             let iter: number = 0
             while ((match = r.exec(nText)) !== null) {
-                console.log(`Found ${match[0]} at ${match.index}. Next starts at ${r.lastIndex}.`)
+                //console.log(`Found ${match[0]} at ${match.index}. Next starts at ${r.lastIndex}.`)
                 const [txt, offset] = processMatch(nText, match, cls)
                 nText = txt
                 r.lastIndex += offset
