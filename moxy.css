@@ -83,6 +83,7 @@
 .syntax-keyword { color: #27aae7; }
 .syntax-function { color: #ffeebd; }
 .syntax-type { color: #43dfc5;}
+.syntax-html, .syntax-html * { color: rgba(108, 150, 212, 0.993) }
 .syntax-string, .syntax-string * { color: #df9668; }
 .syntax-varstring, .syntax-varstring * { color: #89d6fa; }
 .syntax-comment, .syntax-comment * { color: #468e43; }

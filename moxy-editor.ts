@@ -10,6 +10,19 @@ const HTML_CHAR_MAP: any = {
 const escapeChars = (s: string) => s.replace(/[^a-zA-Z0-9]/g, (m: string) => '\\' + m)
 const notMatched = (match: string) => new RegExp('([^\>])(' + escapeChars(match) + ')([^\<])', 'g')
 const decodeHTML = (html: string) => html.replace(REGEX_HTML_CHARS, (m: string) => HTML_CHAR_MAP[m])
+
+interface IMoxyEditorOptions {
+    autoBraces: boolean,
+    autoHtmlTags: boolean,
+    // autoTags
+}
+
+const ASCII_AUTOCOMPLETE_MAP = {
+    123: '\}',
+    40: ')',
+    91: ']',
+}
+
 class MoxyEditor {
     private _editor: HTMLElement
     private _lines: any
@@ -19,13 +32,22 @@ class MoxyEditor {
     private _activeLine: number
     private _prevLine: number
     private _editorAction: string
+    private _options: IMoxyEditorOptions
 
-    constructor(editorId: string) {
+    constructor(editorId: string, options?: IMoxyEditorOptions) {
         this._editor = document.querySelector(`#${editorId}`)
         this._init()
         this._lines = this._editor.querySelector('.lines')
         this._lineNos = this._editor.querySelector('.lineNo')
         this._setup()
+        if (!options) {
+            this._options = {
+                autoBraces: true,
+                autoHtmlTags: true,
+            }
+        } else {
+            this._options = options
+        }
     }
 
     private _init(): void {
@@ -61,11 +83,11 @@ class MoxyEditor {
         element.innerHTML = this._spacesToTab(lines[0])
 
         // Add lines
-        this._tasteTheRainbow(element, '')
+        this._colorizeLine(element, '')
         for (let i = 1; i < lines.length; i++) {
             const element = this._addLine()
             element.innerHTML = this._spacesToTab(lines[i])
-            this._tasteTheRainbow(element, '')
+            this._colorizeLine(element, '')
         }
     }
 
@@ -104,7 +126,7 @@ class MoxyEditor {
             pre.click()
             pre.focus()
             if (tabCount) {
-                this._tasteTheRainbow(pre, '')
+                this._colorizeLine(pre, '')
             }
         }
 
@@ -127,7 +149,7 @@ class MoxyEditor {
             document.execCommand('copy')
         }
         window.onkeyup = (e) => {
-            if(e.which === 8 && !this._isEditable()) {
+            if (e.which === 8 && !this._isEditable()) {
                 this._clearEditor()
                 this._selectAll('disable')
                 this._setActiveLine('1')
@@ -135,7 +157,7 @@ class MoxyEditor {
         }
         this._editor.oncopy = (e) => {
             if (this._editorAction === 'cut') {
-                let text: string = this._getSelectedText()
+                const text: string = this._getSelectedText()
                 e.clipboardData.setData('text', text)
                 this._editorAction = ''
                 this._clearEditor()
@@ -277,11 +299,11 @@ class MoxyEditor {
                     e.target.innerText.substring(0, pos) +
                     '\t'
                     + e.target.innerText.substring(pos)
-                this._tasteTheRainbow(e.target, '')
+                this._colorizeLine(e.target, '')
                 this._setCurrentCursorPosition(e.target, pos + 1)
             } else {
                 e.target.innerHTML += '\t'
-                this._tasteTheRainbow(e.target, '', pos + 1)
+                this._colorizeLine(e.target, '', pos + 1)
             }
             e.stopPropagation()
             e.preventDefault()
@@ -318,7 +340,7 @@ class MoxyEditor {
                 const text = e.target.innerText
                 const element = this._removeLine(e.target.parentElement.dataset.id, true)
                 element.innerText += text
-                setTimeout(() => this._tasteTheRainbow(element, ''), 1)
+                setTimeout(() => this._colorizeLine(element, ''), 1)
                 return
             }
             if (e.target.innerText === '' && e.target.parentElement.dataset.id > 1
@@ -409,7 +431,9 @@ class MoxyEditor {
             textRange.select()
         }
     }
-
+    // TODO - backspace isnt being handled properly after hitting return (newline)
+    // TODO - moving down is off by an index (adding +1)
+    // TODO - add support if you are between lines
     private _handleKeyPress(e: any): void {
         if (e.keyCode === 13) {
             const offset = this._getCaretCharOffset(e.target)
@@ -417,9 +441,9 @@ class MoxyEditor {
             const element = this._addLine(true, e.target.parentElement)
             if (offset !== e.target.innerText.length) {
                 e.target.innerText = e.target.innerText.substring(0, offset)
-                this._tasteTheRainbow(e.target, '')
+                this._colorizeLine(e.target, '')
                 element.innerText += content
-                this._tasteTheRainbow(element, '', element.innerText.length + content.length)
+                this._colorizeLine(element, '', element.innerText.length + content.length)
             } else {
                 this._setCaretPositionToEnd(element)
             }
@@ -428,17 +452,24 @@ class MoxyEditor {
         }
         if (e.keyCode >= 32 && e.keyCode <= 127) {
             e.preventDefault()
+            const char: string = String.fromCharCode(e.keyCode)
             // Handles replacing selected text
             if (this._getSelectedText().length > 1) {
                 const end = this._getCaretCharOffset(e.target)
                 const start = end - this._getSelectedText().length
                 e.target.innerText =
                     e.target.innerText.substring(0, start)
-                    + String.fromCharCode(e.keyCode)
+                    + char
                     + e.target.innerText.substring(end)
-                this._tasteTheRainbow(e.target, '', end)
+                this._colorizeLine(e.target, '', end)
             } else {
-                this._tasteTheRainbow(e.target, String.fromCharCode(e.keyCode))
+                if (this._options.autoBraces) {
+                    return void this._colorizeLine(e.target,
+                        ASCII_AUTOCOMPLETE_MAP[e.keyCode]
+                        ? char + ASCII_AUTOCOMPLETE_MAP[e.keyCode]
+                        : char)
+                }
+                this._colorizeLine(e.target, char)
             }
         }
     }
@@ -487,7 +518,7 @@ class MoxyEditor {
     }
 
     // TODO auto add tabs based on indent level
-    private _tasteTheRainbow(target: any, value: string, positionChar?: number): void {
+    private _colorizeLine(target: any, value: string, positionChar?: number): void {
         const caretPos = this._getCaretCharOffset(target)
         let text: string =
             target.innerText.toString().substring(0, caretPos)
@@ -495,6 +526,7 @@ class MoxyEditor {
             + target.innerText.toString().substring(caretPos)
 
         text = text.replace('\n', '')
+        text = text.replace(/\</g, '&lt;').replace(/\>/g, '&gt;')
         // colorize return to same as if
 
         // TODO - add variable syntax
@@ -504,6 +536,7 @@ class MoxyEditor {
             {class: 'syntax-tab', match: /\t/},
             {sp: true, class: 'syntax-keyword', match: /(let|var|true|false|const|class|interface|private|public) / },
             {sp: true, class: 'syntax-keyword', match: /(([ \n;\t])?(this)|(^this))/ },
+            {class: 'syntax-html', match: /(&lt;)\/?(html|body|br|ul|li|article|aside|main|div|span|p|i|b|strong|) ?\/?(&gt;)/},
             {class: 'syntax-operator', match: /(===|==| = |!==|<=|>=|&&|\|\||&lt;|&gt;)/ },
             {class: 'syntax-statement', match: /(([ \n;\t])?(if|else|return|break)|(^if|^else|^return|^break))/ },
             {class: 'syntax-string', match: /'([^']*)'/},
