@@ -16,4 +16,4 @@ Moxy Code Editor for your browser.
 * Potentially hook into a service so it can compile code in real time
 
 ## Learn more
-* Learn more about the
+* Learn more about the author via [LinkedIn](https://www.linkedin.com/in/daniel-moxon/)
