@@ -25,16 +25,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dcmox/debounceif.git"
+    "url": "git+https://github.com/dcmox/moxyeditor.git"
   },
   "keywords": [
     "debounce",
     "retry"
   ],
   "author": "Daniel Moxon (dancmox@comcast.net)",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/dcmox/debounceif/issues"
+    "url": "https://github.com/dcmox/moxyeditor/issues"
   },
-  "homepage": "https://github.com/dcmox/debounceif#readme"
+  "homepage": "https://github.com/dcmox/moxyeditor#readme"
 }
