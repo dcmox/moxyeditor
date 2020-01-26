@@ -1,0 +1,83 @@
+.moxyEditor{
+    margin: 0 auto;
+    background-color: #222;
+    width: 90%;
+    height: 400px;
+    border: 1px solid #333;
+    overflow-y: scroll;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 12px;
+    color: #bbb;
+    cursor: text;
+}
+.moxyEditor .lineNo{
+    float: left;
+    display: block;
+    text-align: right;
+    width: 20px;
+    padding-right: 5px;
+    min-height: 15px;
+    -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+    -khtml-user-select: none; /* Konqueror HTML */
+    -moz-user-select: none; /* Old versions of Firefox */
+    -ms-user-select: none; /* Internet Explorer/Edge */
+    user-select: none; /* Non-prefixed version, currently supported by Chrome, Opera and Firefox */
+}
+.moxyEditor .lineNo span{
+    display: block;
+    width: 20px;
+}
+.moxyEditor .lines{
+    float: left;
+    display: block;
+    width: calc(100% - 25px);
+}
+.moxyEditor .cursor.blink::after{
+    content: '|';
+}
+.moxyEditor .cursor{
+    position: absolute;
+    z-index: 1;
+    display: inline-block;
+}
+.moxyEditor .lines .line{
+    width: 100%;
+    position: relative;
+    min-height: 15px;
+    display: block;
+}
+.moxyEditor .line pre {
+    display: inline-block;
+    font-family: 'Source Code Pro', monospace;
+    margin: 0;
+}
+.moxyEditor .line:focus {
+    outline-width: 0;
+}
+
+.syntax-string { color: #c46a33; }
+.syntax-operator { color: #fff; }
+.syntax-braces { color: #c84ad6; }
+.syntax-statement {color: #cd6cd8; }
+.syntax-keyword { color: #27aae7; }
+.syntax-function { color: #edd180; }
+.syntax-comment { color: #468e43; }
+.syntax-type { color: #15ada6;}
+.moxyEditor::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+/* Track */
+.moxyEditor::-webkit-scrollbar-track {
+    background: #000; 
+}
+/* Handle */
+.moxyEditor::-webkit-scrollbar-thumb {
+    background: #555; 
+}
+/* Handle on hover */
+.moxyEditor::-webkit-scrollbar-thumb:hover {
+    background: #333; 
+}
+.moxyEditor::-webkit-scrollbar-corner { background:#555 }
