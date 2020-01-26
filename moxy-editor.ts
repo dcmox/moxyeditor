@@ -1,3 +1,8 @@
+/**
+ * Copyright (C) 2020 Daniel Moxon
+ * https://github.com/dcmox/moxyeditor
+ */
+
 const REGEX_HTML_CHARS = /[&<>"']/g
 const HTML_CHAR_MAP: any = {
     '"': '&quot;',
