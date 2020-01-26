@@ -48,9 +48,15 @@ class MoxyEditor {
     private _addLine(focus: boolean = false, insertAfterLine?: HTMLElement): void {
         const div: HTMLElement = document.createElement('div')
         const pre: HTMLElement = document.createElement('pre')
+        pre.contentEditable = 'true'
         div.innerHTML = ''
         div.className = 'line'
         div.dataset.id = (++this._id).toString()
+        let tabCount: number = 0
+        if (insertAfterLine && insertAfterLine.innerHTML.indexOf('\t') > -1) {
+            tabCount = insertAfterLine.innerHTML.split('\t').length
+            pre.innerHTML = new Array(tabCount - 1).fill('\t').join('')
+        }
         div.appendChild(pre)
         this._lineCount++
         div.tabIndex = 0
@@ -62,12 +68,16 @@ class MoxyEditor {
             this._lines.append(div)
         }
 
-        div.onkeydown = (e) => this._handleKeyDown(e)
-        div.onkeypress = (e) => this._handleKeyPress(e)
-        div.onclick = (e) => this._handleLineClick(e)
+        pre.onkeypress = (e) => this._handleKeyPress(e)
+        pre.onkeydown = (e) => this._handleKeyDown(e)
+        pre.onclick = (e) => this._handleLineClickFromPre(e)
+
         if (focus === true) {
-            div.click()
-            div.focus()
+            pre.click()
+            pre.focus()
+            if (tabCount) {
+                this._tasteTheRainbow(pre, '')
+            }
         }
     }
     private _addLineNo(): void {
@@ -80,127 +90,184 @@ class MoxyEditor {
         this._editor.onclick = () => {
             this._setActiveLine(this._lines.querySelector('div.line:last-child').dataset.id)
         }
-        this._editor.onblur = () => {
-            clearInterval(this._cursor)
-            this._editor.querySelector('.blink').classList.remove('blink')
-        }
     }
-    private _handleLineClick(e: any): void {
-        if (!e.target.dataset.id) {
+    private _handleLineClickFromPre(e: any): void {
+        console.log(e.target.parentElement)
+        if (!e.target.parentElement.dataset.id) {
             return
         }
         this._prevLine = this._activeLine
 
-        this._activeLine = e.target.dataset.id
+        this._activeLine = e.target.parentElement.dataset.id
+
         e.target.focus()
-        this._addCursor()
         e.stopPropagation()
     }
-    // add shift + selection highlight
-    // add cursor position
+    private _getCaretCharOffset = (element: any) => {
+        let caretOffset = 0
+
+        if (window.getSelection) {
+            const range = window.getSelection().getRangeAt(0)
+            const preCaretRange = range.cloneRange()
+            preCaretRange.selectNodeContents(element)
+            preCaretRange.setEnd(range.endContainer, range.endOffset)
+            caretOffset = preCaretRange.toString().length
+        } else if (document.selection && document.selection.type !== 'Control') {
+            const textRange = document.selection.createRange()
+            const preCaretTextRange = document.body.createTextRange()
+            preCaretTextRange.moveToElementText(element)
+            preCaretTextRange.setEndPoint('EndToEnd', textRange)
+            caretOffset = preCaretTextRange.text.length
+        }
+
+        return caretOffset;
+    }
+
     private _handleKeyDown(e: any): void {
         if (e.keyCode === 9) {
-            e.target.querySelector('pre').innerHTML += '\t'
+            console.log(e.target.innerHTML)
+            e.target.innerHTML += '\t'
             e.stopPropagation()
             e.preventDefault()
-        }
-        if (e.keyCode === 38 && e.target.dataset.id > 1) {
-            this._setActiveLine(e.target.previousSibling.dataset.id)
-            return
-        }
-        if (e.keyCode === 40 && e.target.nextSibling) {
-            this._setActiveLine(e.target.nextSibling.dataset.id)
+            this._tasteTheRainbow(e.target, '')
             return
         }
 
-        if (e.keyCode === 37) {
-            if (Number(this._lines.querySelector(`.cursor`).style.left) > 0) {
-                this._lines.querySelector(`.cursor`).style.left -= 7
-            }
+        if (e.keyCode === 38 && e.target.parentElement.dataset.id > 1) {
+            this._setActiveLine(e.target.parentElement.previousSibling.dataset.id)
+            return
         }
-
-        if (e.keyCode === 39) {
-            this._lines.querySelector(`.cursor`).style.left += 7
+        if (e.keyCode === 40 && e.target.parentElement.nextSibling) {
+            this._setActiveLine(e.target.parentElement.nextSibling.dataset.id)
+            return
         }
 
         if (e.keyCode === 8) {
-            if (e.target.querySelector('pre').innerText === '' && e.target.dataset.id > 1) {
-                this._removeLine(e.target.dataset.id, true)
+            if (e.target.innerText === '' && e.target.parentElement.dataset.id > 1) {
+                this._removeLine(e.target.parentElement.dataset.id, true)
                 return
             }
             const sel = window.getSelection()
+            //const pos = this._getCaretCharOffset(e.target)
+
             if (sel && sel.anchorOffset !== sel.focusOffset) {
-                e.target.querySelector('pre').innerText =
-                    e.target.querySelector('pre').innerText.slice(0, sel.anchorOffset)
-                    + e.target.querySelector('pre').innerText.slice(sel.anchorOffset + sel.focusOffset)
+                let start: number
+                let end: number
+                if ( sel.anchorOffset < sel.focusOffset) {
+                    start = sel.anchorOffset
+                    end =  sel.focusOffset
+                } else {
+                    start = sel.focusOffset
+                    end =  sel.anchorOffset
+                }
+                if (sel.toString().length > end - start) {
+                    console.log('multi line delete!')
+                    const numLines: number = sel.toString().split('\n').length
+                    console.log('num lines', numLines)
+                    let target: string = e.target.dataset.id
+                    let nextTarget: string = e.target.previousSibling
+                        ? e.target.previousSibling.dataset.id
+                        : ''
+                    if (nextTarget) {
+                        for (let i = 0; i < numLines; i++) {
+                            this._removeLine(target)
+                            target = nextTarget
+                            nextTarget = this._lines
+                                .querySelector('div[data-id="' + target + '"]')
+                                .previousSibling.dataset.id
+                        }
+                        return
+                    } else {
+                        e.target.innerText = ''
+                        return
+                    }
+                }
             }
-
-            e.target.querySelector('pre').innerText =
-                e.target.querySelector('pre').innerText.slice(0, e.target.querySelector('pre').innerText.length - 1)
-
-            this._tasteTheRainbow(e.target)
+ 
+            this._tasteTheRainbow(e.target, '')
         }
     }
 
-    private _removeLine(lineNo: string, focus: boolean): void {
+    private _removeLine(lineNo: string, focus: boolean = false): void {
         this._lineNos.querySelector('span:last-child').remove()
-        const prev: string = this._lines.querySelector('div[data-id="' + lineNo + '"]').previousSibling.dataset.id
+        const prevSibling = this._lines.querySelector('div[data-id="' + lineNo + '"]').previousSibling
+        const prev: string = prevSibling.dataset.id
         this._lines.querySelector('div[data-id="' + lineNo + '"]').remove()
         this._setActiveLine(prev)
+        setTimeout( () => this._setCaretPosition(prevSibling.querySelector('pre')), 1)
         this._lineCount--
     }
     private _setActiveLine(lineNo: string): void {
         if (this._lines.querySelector(`div[data-id="${lineNo}"]`)) {
-            this._lines.querySelector(`div[data-id="${lineNo}"]`).click()
+            this._lines.querySelector(`div[data-id="${lineNo}"] pre`).click()
         }
     }
+    private _setCaretPosition(target: any): void {
+        target.focus()
+        if (typeof window.getSelection !== 'undefined'
+                && typeof document.createRange !== 'undefined') {
+            const range = document.createRange()
+            range.selectNodeContents(target)
+            range.collapse(false)
+            const sel = window.getSelection()
+            sel.removeAllRanges()
+            sel.addRange(range)
+        } else if (typeof document.body.createTextRange !== 'undefined') {
+            const textRange = document.body.createTextRange()
+            textRange.moveToElementText(target)
+            textRange.collapse(false)
+            textRange.select()
+        }
+    }
+
     private _handleKeyPress(e: any): void {
         if (e.keyCode === 13) {
-            this._addLine(true, e.target)
+            this._addLine(true, e.target.parentElement)
+            e.preventDefault()
             return
         }
-        e.target.querySelector('pre').innerText += String.fromCharCode(e.keyCode)
-        this._tasteTheRainbow(e.target)
+        if (e.keyCode >= 32 && e.keyCode <= 127) {
+            e.preventDefault()
+            this._tasteTheRainbow(e.target, String.fromCharCode(e.keyCode))
+        }
     }
-    private _tasteTheRainbow(target: any): void {
-        const text = target.querySelector('pre').innerText.toString()
-        console.log(text)
+    // todo get inserting at spot to work correctly
+    // auto add tabs based on indent level
+    private _tasteTheRainbow(target: any, value: string): void {
+        let text = target.innerText.toString() + value
+        text = text.replace('\n', '')
         // colorize return to same as if
         const classes = [
+            {class: 'syntax-tab', match: /\t/},
             {sp: true, class: 'syntax-keyword', match: /(([ \n;\t])(let|class|interface|private|public)|(^let|^class|^interface|^private|^public)) / },
-            {sp: true, class: 'syntax-keyword', match: /(([ \n;\t])(this)|(^this))/ },
-            {class: 'syntax-statement', match: /(([ \n;\t])(if|else|return)|(^if|else|return))/ },
+            {sp: true, class: 'syntax-keyword', match: /(([ \n;\t])?(this)|(^this))/ },
+            {class: 'syntax-statement', match: /(([ \n;\t])?(if|else|return)|(^if|^else|^return))/ },
             {class: 'syntax-string', match: /'([^']*)'/},
             {class: 'syntax-function', match: /([a-zA-Z0-9]+)((\()([^\)]*)(\)))/},
             {class: 'syntax-braces', match: /(\[\]|\[|\]|\(\)|\(|\)|\{\}|\{|\})/},
+            {class: 'syntax-braces', match: /({|})/},
             {class: 'syntax-comment', match: /((\/\*)(.*)(\*\/)|(\/\/)(.*))/},
             {sp: true, class: `syntax-type`, match: /(?:: ?)([a-zA-Z]*)/g},
         ]
 
-        const classesExtended = [
-            {class: 'syntax-function', match: /([a-zA-Z0-9]*)(?:(\()(.*)(\)))/g},
-        ]
         let nText = text
-        let iter: number = 0
-
-        // nText = nText.replace(/([^\>])(class)([^\<])/g, '<span class="syntax-keyword">class</span>')
 
         const processMatch = (text: string, match: any, cls: any): any => {
             if (match && match[0] && match[0].length) {
                 let nText: string = text
-                console.log(match)
                 let replacement: string = `<span class="${cls.class}">${match[0]}</span>`
                 if (cls.sp) {
                     if (cls.class === 'syntax-type') {
                         replacement = `:<span class="${cls.class}">${match[0].slice(1)}</span>`
                     }
-                    if (cls.class === 'syntax-keyword') {
-                        console.log('MATCH', match)
-                    }
                 }
+
                 nText = nText.substring(0, match.index)
                     + replacement
                     + nText.substring(match.index + match[0].length)
+                if (cls.class === 'syntax-tab') {
+                    return [ nText, replacement.length - 4]
+                }
                 return [ nText, replacement.length ]
             }
             return [ text, 0]
@@ -223,34 +290,7 @@ class MoxyEditor {
                 }
             }
         })
-        target.querySelector('pre').innerHTML = nText
-    }
-    private _addCursor(): void {
-        if (this._lines.querySelector('.cursor')) {
-            this._lines.querySelector('.cursor').remove()
-        }
-        const cursor = document.createElement('div')
-        cursor.className = 'cursor'
-        console.log(this._activeLine)
-        this._lines.querySelector(`div[data-id="${this._activeLine}"]`).append(cursor)
-        if (this._cursor) {
-            clearInterval(this._cursor)
-            if ( this._lines.querySelector(`.blink`)) {
-                this._lines.querySelector(`.blink`).classList.remove('blink')
-            }
-        }
-        this._cursor = setInterval(() => {
-            if (!this._lines.querySelector(`div[data-id="${this._activeLine}"]`)) {
-                clearTimeout(this._cursor)
-                return
-            }
-            const classList = Array.from(this._lines.querySelector(`.cursor`).classList)
-            // tslint:disable-next-line: no-bitwise
-            if (classList && ~classList.indexOf('blink')) {
-                this._lines.querySelector(`.cursor`).classList.remove('blink')
-            } else {
-                this._lines.querySelector(`.cursor`).classList.add('blink')
-            }
-        }, 600)
+        target.innerHTML = nText
+        this._setCaretPosition(target)
     }
 }
