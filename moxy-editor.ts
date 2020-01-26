@@ -17,8 +17,8 @@ class MoxyEditor {
     private _id: number = 0
     private _lineCount: number = 0
     private _activeLine: number
-    private _cursor: any
     private _prevLine: number
+
     constructor(editorId: string) {
         this._editor = document.querySelector(`#${editorId}`)
         this._init()
@@ -44,11 +44,34 @@ class MoxyEditor {
         this._addLine()
         this._addEvents()
     }
+    private _handlePaste(e: any, element: any): void {
+        // Stop data actually being pasted into div
+        e.stopPropagation()
+        e.preventDefault()
 
-    private _addLine(focus: boolean = false, insertAfterLine?: HTMLElement): void {
+        // Get pasted data via clipboard API
+        const clipboardData = e.clipboardData || window.clipboardData
+        const pastedData = clipboardData.getData('text')
+        const div: HTMLElement = document.createElement('div')
+        div.innerHTML = pastedData
+        const lines: string[] = div.innerText.split('\n')
+        element.innerHTML = this._spacesToTab(lines[0])
+        this._tasteTheRainbow(element, '')
+        for (let i = 1; i < lines.length; i++) {
+            const element = this._addLine()
+            element.innerHTML = this._spacesToTab(lines[i])
+            this._tasteTheRainbow(element, '')
+        }
+    }
+
+    private _spacesToTab = (str: string) => str.replace(/    /g, '\t')
+
+    private _addLine(focus: boolean = false, insertAfterLine?: HTMLElement): any {
         const div: HTMLElement = document.createElement('div')
         const pre: HTMLElement = document.createElement('pre')
         pre.contentEditable = 'true'
+        pre.spellcheck = false
+        pre.onpaste = (e) => this._handlePaste(e, pre)
         div.innerHTML = ''
         div.className = 'line'
         div.dataset.id = (++this._id).toString()
@@ -79,6 +102,8 @@ class MoxyEditor {
                 this._tasteTheRainbow(pre, '')
             }
         }
+
+        return pre
     }
     private _addLineNo(): void {
         const span: HTMLElement = document.createElement('span')
@@ -92,17 +117,15 @@ class MoxyEditor {
         }
     }
     private _handleLineClickFromPre(e: any): void {
-        console.log(e.target.parentElement)
-        if (!e.target.parentElement.dataset.id) {
-            return
-        }
+        if (!e.target.parentElement.dataset.id) { return }
+
         this._prevLine = this._activeLine
-
         this._activeLine = e.target.parentElement.dataset.id
-
+        console.log('test')
         e.target.focus()
         e.stopPropagation()
     }
+
     private _getCaretCharOffset = (element: any) => {
         let caretOffset = 0
 
@@ -120,17 +143,24 @@ class MoxyEditor {
             caretOffset = preCaretTextRange.text.length
         }
 
-        return caretOffset;
+        return caretOffset
     }
 
     private _handleKeyDown(e: any): void {
         if (e.keyCode === 9) {
-            console.log(e.target.innerHTML)
             e.target.innerHTML += '\t'
             e.stopPropagation()
             e.preventDefault()
             this._tasteTheRainbow(e.target, '')
             return
+        }
+
+        if (e.keyCode === 37) {
+            const pos = this._getCaretCharOffset(e.target)
+            console.log(e.target.innerText)
+            if (e.target.innerText.substring(pos - 1).indexOf('\t') !== -1) {
+                e.preventDefault()
+            }
         }
 
         if (e.keyCode === 38 && e.target.parentElement.dataset.id > 1) {
@@ -143,27 +173,26 @@ class MoxyEditor {
         }
 
         if (e.keyCode === 8) {
-            if (e.target.innerText === '' && e.target.parentElement.dataset.id > 1) {
+            if (e.target.innerText === '' && e.target.parentElement.dataset.id > 1
+                || e.target.innerHTML === '<br>') {
                 this._removeLine(e.target.parentElement.dataset.id, true)
                 return
             }
             const sel = window.getSelection()
-            //const pos = this._getCaretCharOffset(e.target)
 
             if (sel && sel.anchorOffset !== sel.focusOffset) {
                 let start: number
                 let end: number
-                if ( sel.anchorOffset < sel.focusOffset) {
+                if (sel.anchorOffset < sel.focusOffset) {
                     start = sel.anchorOffset
                     end =  sel.focusOffset
                 } else {
                     start = sel.focusOffset
                     end =  sel.anchorOffset
                 }
+
                 if (sel.toString().length > end - start) {
-                    console.log('multi line delete!')
                     const numLines: number = sel.toString().split('\n').length
-                    console.log('num lines', numLines)
                     let target: string = e.target.dataset.id
                     let nextTarget: string = e.target.previousSibling
                         ? e.target.previousSibling.dataset.id
@@ -183,26 +212,32 @@ class MoxyEditor {
                     }
                 }
             }
- 
-            this._tasteTheRainbow(e.target, '')
+        }
+    }
+    // TODO - detect paste
+
+    private _removeLine(lineNo: string, focus: boolean = false): void {
+        if (this._lineNos.querySelector('span:last-child')) {
+            this._lineNos.querySelector('span:last-child').remove()
+        }
+        const elem = this._lines.querySelector('div[data-id="' + lineNo + '"]')
+        if (elem) {
+            const prevSibling = elem.previousSibling
+            const prev: string = prevSibling.dataset.id
+            elem.remove()
+            this._setActiveLine(prev)
+            setTimeout(() => this._setCaretPositionToEnd(prevSibling.querySelector('pre')), 1)
+            this._lineCount--
         }
     }
 
-    private _removeLine(lineNo: string, focus: boolean = false): void {
-        this._lineNos.querySelector('span:last-child').remove()
-        const prevSibling = this._lines.querySelector('div[data-id="' + lineNo + '"]').previousSibling
-        const prev: string = prevSibling.dataset.id
-        this._lines.querySelector('div[data-id="' + lineNo + '"]').remove()
-        this._setActiveLine(prev)
-        setTimeout( () => this._setCaretPosition(prevSibling.querySelector('pre')), 1)
-        this._lineCount--
-    }
     private _setActiveLine(lineNo: string): void {
         if (this._lines.querySelector(`div[data-id="${lineNo}"]`)) {
             this._lines.querySelector(`div[data-id="${lineNo}"] pre`).click()
         }
     }
-    private _setCaretPosition(target: any): void {
+
+    private _setCaretPositionToEnd(target: any): void {
         target.focus()
         if (typeof window.getSelection !== 'undefined'
                 && typeof document.createRange !== 'undefined') {
@@ -228,21 +263,75 @@ class MoxyEditor {
         }
         if (e.keyCode >= 32 && e.keyCode <= 127) {
             e.preventDefault()
-            this._tasteTheRainbow(e.target, String.fromCharCode(e.keyCode))
+            this._tasteTheRainbow(e.target, String.fromCharCode(e.keyCode), false)
         }
     }
-    // todo get inserting at spot to work correctly
-    // auto add tabs based on indent level
-    private _tasteTheRainbow(target: any, value: string): void {
-        let text = target.innerText.toString() + value
+
+    // Courtesy of https://jsfiddle.net/nrx9yvw9/5/
+    private _createRange = (node: any, chars: any, range?: any) => {
+        if (!range) {
+            range = document.createRange()
+            range.selectNode(node)
+            range.setStart(node, 0)
+        }
+
+        if (chars.count === 0) {
+            range.setEnd(node, chars.count)
+        } else if (node && chars.count > 0) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                if (node.textContent.length < chars.count) {
+                    chars.count -= node.textContent.length
+                } else {
+                     range.setEnd(node, chars.count)
+                     chars.count = 0
+                }
+            } else {
+                // tslint:disable-next-line: prefer-for-of
+                for (let lp = 0; lp < node.childNodes.length; lp++) {
+                    range = this._createRange(node.childNodes[lp], chars, range)
+                    if (chars.count === 0) {
+                       break
+                    }
+                }
+            }
+        }
+        return range
+    }
+
+    private _setCurrentCursorPosition = (element: any, chars: number) => {
+        if (chars >= 0) {
+            const selection = window.getSelection()
+            const range = this._createRange(element.parentNode, { count: chars })
+            if (range) {
+                range.collapse(false)
+                selection.removeAllRanges()
+                selection.addRange(range)
+            }
+        }
+    }
+
+    // TODO auto add tabs based on indent level
+    private _tasteTheRainbow(target: any, value: string, positionChar: boolean = true): void {
+        const caretPos = this._getCaretCharOffset(target)
+        let text: string =
+            target.innerText.toString().substring(0, caretPos)
+            + value
+            + target.innerText.toString().substring(caretPos)
+
         text = text.replace('\n', '')
         // colorize return to same as if
+
+        // TODO - add variable syntax
         const classes = [
+            // doesnt seem to work
+            // {class: 'syntax-varstring', match: /\`\$\{([^\`]*)\}\`/ },
             {class: 'syntax-tab', match: /\t/},
-            {sp: true, class: 'syntax-keyword', match: /(([ \n;\t])(let|class|interface|private|public)|(^let|^class|^interface|^private|^public)) / },
+            {sp: true, class: 'syntax-keyword', match: /(let|var|true|false|const|class|interface|private|public) / },
             {sp: true, class: 'syntax-keyword', match: /(([ \n;\t])?(this)|(^this))/ },
-            {class: 'syntax-statement', match: /(([ \n;\t])?(if|else|return)|(^if|^else|^return))/ },
+            {class: 'syntax-operator', match: /(===|==| = |!==|<=|>=|&&|\|\||&lt;|&gt;)/ },
+            {class: 'syntax-statement', match: /(([ \n;\t])?(if|else|return|break)|(^if|^else|^return|^break))/ },
             {class: 'syntax-string', match: /'([^']*)'/},
+            {class: 'syntax-string', match: /\`([^\`]*)\`/},
             {class: 'syntax-function', match: /([a-zA-Z0-9]+)((\()([^\)]*)(\)))/},
             {class: 'syntax-braces', match: /(\[\]|\[|\]|\(\)|\(|\)|\{\}|\{|\})/},
             {class: 'syntax-braces', match: /({|})/},
@@ -250,7 +339,7 @@ class MoxyEditor {
             {sp: true, class: `syntax-type`, match: /(?:: ?)([a-zA-Z]*)/g},
         ]
 
-        let nText = text
+        let nText: string = text
 
         const processMatch = (text: string, match: any, cls: any): any => {
             if (match && match[0] && match[0].length) {
@@ -266,11 +355,11 @@ class MoxyEditor {
                     + replacement
                     + nText.substring(match.index + match[0].length)
                 if (cls.class === 'syntax-tab') {
-                    return [ nText, replacement.length - 4]
+                    return [ nText, replacement.length - 4 ]
                 }
                 return [ nText, replacement.length ]
             }
-            return [ text, 0]
+            return [ text, 0 ]
         }
 
         classes.forEach((cls) => {
@@ -291,6 +380,6 @@ class MoxyEditor {
             }
         })
         target.innerHTML = nText
-        this._setCaretPosition(target)
+        this._setCurrentCursorPosition(target, caretPos + 1)
     }
 }
